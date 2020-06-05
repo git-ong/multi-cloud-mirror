@@ -24,14 +24,14 @@ import sys
 import time
 import datetime
 import argparse
-import ConfigParser
+import configparser
 import multiprocessing
 from boto.exception import S3ResponseError, S3PermissionsError, S3CopyError
 from cloudfiles.errors import (ResponseError, NoSuchContainer, InvalidContainerName, InvalidUrl,
                                ContainerNotPublic, AuthenticationFailed, AuthenticationError,
                                NoSuchObject, InvalidObjectName, InvalidMetaName, InvalidMetaValue,
                                InvalidObjectSize, IncompleteSend)
-from ConfigParser import NoSectionError, NoOptionError, MissingSectionHeaderError, ParsingError
+from configparser import NoSectionError, NoOptionError, MissingSectionHeaderError, ParsingError
 from email.mime.text import MIMEText
 from subprocess import Popen, PIPE
 
@@ -48,14 +48,14 @@ def connectToClouds():
       ## boto reads from /etc/boto.cfg (or ~/boto.cfg)
       s3Conn = boto.connect_s3()
       ## the cloud files library doesn't automatically read from a file, so we handle that here:
-      cfConfig = ConfigParser.ConfigParser()
+      cfConfig = configparser.ConfigParser()
       cfConfig.read('/etc/cloudfiles.cfg')
       cfConn = cloudfiles.get_connection(cfConfig.get('Credentials','username'), cfConfig.get('Credentials','api_key'))
-   except (NoSectionError, NoOptionError, MissingSectionHeaderError, ParsingError), err:
+   except (NoSectionError, NoOptionError, MissingSectionHeaderError, ParsingError) as err:
       raise MultiCloudMirrorException("Error in reading Cloud Files configuration file (/etc/cloudfiles.cfg): %s" % (err))
-   except (S3ResponseError, S3PermissionsError), err:
+   except (S3ResponseError, S3PermissionsError) as err:
       raise MultiCloudMirrorException("Error in connecting to S3: [%d] %s" % (err.status, err.reason))
-   except (ResponseError, InvalidUrl, AuthenticationFailed, AuthenticationError), err:
+   except (ResponseError, InvalidUrl, AuthenticationFailed, AuthenticationError) as err:
       raise MultiCloudMirrorException("Error in connecting to CF: %s" % (err))
    return (s3Conn, cfConn)
 
@@ -169,7 +169,7 @@ class MultiCloudMirror:
       Log function for MultiCloudMirror class: email and printing to screen
       """
       if level >= 0:
-         if self.debug: print msg
+         if self.debug: print (msg)
          if level >= 1:
             self.emailMsg += msg + "\n"
 
@@ -332,7 +332,7 @@ class MultiCloudMirror:
                         self.logItem("Error in %s %s to/from S3 bucket %s: [%d] %s" % (job_dict['task'], job_dict['myKeyName'], job_dict['s3BucketName'], err.status, err.reason), self.LOG_WARN)
                         self.jobs.remove(job_dict)
                      except (ResponseError, NoSuchContainer, InvalidContainerName, InvalidUrl, ContainerNotPublic, AuthenticationFailed, AuthenticationError,
-                             NoSuchObject, InvalidObjectName, InvalidMetaName, InvalidMetaValue, InvalidObjectSize, IncompleteSend), err:
+                             NoSuchObject, InvalidObjectName, InvalidMetaName, InvalidMetaValue, InvalidObjectSize, IncompleteSend) as err:
                         self.logItem("Error in %s %s to/from to CF container %s: %s" % (job_dict['task'], job_dict['myKeyName'], job_dict['cfBucketName'], err), self.LOG_WARN)
                         self.jobs.remove(job_dict)
                      except MultiCloudMirrorException as err:
@@ -393,10 +393,10 @@ class MultiCloudMirror:
          # Connect to the proper buckets and retrieve file lists
          try:
             self.connectToBuckets(srcService, srcBucketName, destBucketName)
-         except (S3ResponseError, S3PermissionsError), err:
+         except (S3ResponseError, S3PermissionsError) as err:
             self.logItem("Error in connecting to S3 bucket: [%d] %s" % (err.status, err.reason), self.LOG_WARN)
             continue
-         except (ResponseError, NoSuchContainer, InvalidContainerName, InvalidUrl, ContainerNotPublic, AuthenticationFailed, AuthenticationError), err:
+         except (ResponseError, NoSuchContainer, InvalidContainerName, InvalidUrl, ContainerNotPublic, AuthenticationFailed, AuthenticationError) as err:
             self.logItem("Error in connecting to CF container: %s" % (err), self.LOG_WARN)
             continue
          # Iterate through files at the source to see which ones to copy, and put them on the multiprocessing queue:
@@ -447,4 +447,4 @@ if __name__ == '__main__':
       mcm = MultiCloudMirror(args.sync, args.numProcesses, args.maxFileSize, args.emailDest, args.emailSrc, args.emailSubj, args.tmpDir, args.debug, args.sendmail, args.delete, args.maxFileDeletion, args.minFileSync)
       mcm.run()
    except MultiCloudMirrorException as err:
-      print "Error from MultiCloudMirror: %s" % (str(err))
+      print ("Error from MultiCloudMirror: %s" % (str(err)))

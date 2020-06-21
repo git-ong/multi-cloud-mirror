@@ -17,7 +17,8 @@ versa.
 ### Imports
 #######################################################################
 import boto
-import cloudfiles
+# import cloudfiles
+import pyrax
 import smtplib
 import os
 import sys
@@ -27,10 +28,10 @@ import argparse
 import configparser
 import multiprocessing
 from boto.exception import S3ResponseError, S3PermissionsError, S3CopyError
-from cloudfiles.errors import (ResponseError, NoSuchContainer, InvalidContainerName, InvalidUrl,
-                               ContainerNotPublic, AuthenticationFailed, AuthenticationError,
-                               NoSuchObject, InvalidObjectName, InvalidMetaName, InvalidMetaValue,
-                               InvalidObjectSize, IncompleteSend)
+# from cloudfiles.errors import (ResponseError, NoSuchContainer, InvalidContainerName, InvalidUrl,
+#                                ContainerNotPublic, AuthenticationFailed, AuthenticationError,
+#                                NoSuchObject, InvalidObjectName, InvalidMetaName, InvalidMetaValue,
+#                                InvalidObjectSize, IncompleteSend)
 from configparser import NoSectionError, NoOptionError, MissingSectionHeaderError, ParsingError
 from email.mime.text import MIMEText
 from subprocess import Popen, PIPE
@@ -50,13 +51,20 @@ def connectToClouds():
       ## the cloud files library doesn't automatically read from a file, so we handle that here:
       cfConfig = configparser.ConfigParser()
       cfConfig.read('/etc/cloudfiles.cfg')
-      cfConn = cloudfiles.get_connection(cfConfig.get('Credentials','username'), cfConfig.get('Credentials','api_key'))
-   except (NoSectionError, NoOptionError, MissingSectionHeaderError, ParsingError) as err:
-      raise MultiCloudMirrorException("Error in reading Cloud Files configuration file (/etc/cloudfiles.cfg): %s" % (err))
-   except (S3ResponseError, S3PermissionsError) as err:
-      raise MultiCloudMirrorException("Error in connecting to S3: [%d] %s" % (err.status, err.reason))
-   except (ResponseError, InvalidUrl, AuthenticationFailed, AuthenticationError) as err:
-      raise MultiCloudMirrorException("Error in connecting to CF: %s" % (err))
+      pyrax.set_setting("identity_type", "rackspace")
+      pyrax.set_default_region(cfConfig.get('Credentials','region'))
+      pyrax.set_credentials(cfConfig.get('Credentials','username'), cfConfig.get('Credentials','api_key'))
+      cfConn = pyrax.connect_to_cloudfiles(cfConfig.get('Credentials','region'))
+   #    cfConn = cloudfiles.get_connection(cfConfig.get('Credentials','username'), cfConfig.get('Credentials','api_key'))
+   # except (NoSectionError, NoOptionError, MissingSectionHeaderError, ParsingError) as err:
+   #    raise MultiCloudMirrorException("Error in reading Cloud Files configuration file (/etc/cloudfiles.cfg): %s" % (err))
+   # except (S3ResponseError, S3PermissionsError) as err:
+   #    raise MultiCloudMirrorException("Error in connecting to S3: [%d] %s" % (err.status, err.reason))
+   # except (ResponseError, InvalidUrl, AuthenticationFailed, AuthenticationError) as err:
+   #    raise MultiCloudMirrorException("Error in connecting to CF: %s" % (err))
+   except Exception as err:
+      raise Exception ("Error in connecting to CF: %s" % (err))
+
    return (s3Conn, cfConn)
 
 
@@ -72,7 +80,7 @@ def copyToS3(srcBucketName, myKeyName, destBucketName,tmpDir):
    # note that maximum file size (as of this writing) for Cloud Files is 5GB, and we expect 6+GB free on the drive
    (s3Conn, cfConn) = connectToClouds()
    tmpFile = str(tmpDir + '/' + myKeyName)
-   cfConn.get_container(srcBucketName).get_object(myKeyName).save_to_filename(tmpFile)
+   pyrax.cloudfiles.download_object(cfConn.get_container(srcBucketName), myKeyName, tmpDir)
    destBucket = s3Conn.get_bucket(destBucketName)
    newObj = None
    try:
@@ -96,11 +104,13 @@ def copyToCF(srcBucketName, myKeyName, destBucketName):
    #with S3, we must request the key singly to get its metadata:
    fullKey = srcBucket.get_key(myKeyName)
    #initialize new object at Cloud Files
-   newObj = destBucket.create_object(myKeyName)
-   newObj.content_type = fullKey.content_type or "application/octet-stream"
-   newObj.size = fullKey.size
+   # newObj = destBucket.create_object(myKeyName)
+   # newObj.content_type = fullKey.content_type or "application/octet-stream"
+   # newObj.size = fullKey.size
    #stream the file from S3 to Cloud Files
-   newObj.send(fullKey)
+   # newObj.send(fullKey)
+   content_type = fullKey.content_type or fullKey.DefaultContentType
+   newObj = destBucket.create(obj_name=myKeyName, data=fullKey.get_contents_as_string(), content_type=content_type)
 
 #######################################################################
 ### Delete functions
@@ -283,6 +293,13 @@ class MultiCloudMirror:
       if myKeyName[-1] == '/':
          self.logItem("Skipping %s because it is a 'folder'" % (myKeyName), self.LOG_DEBUG)
          return
+      if srcService == "cf":
+         cfBucketName = srcBucketName
+         s3BucketName = destBucketName
+         sKey.size = sKey.total_bytes
+      else:
+         s3BucketName = srcBucketName
+         cfBucketName = destBucketName
       if (sKey.size > self.maxFileSize):
          self.logItem("Skipping %s because it is too large (%d bytes)" % (myKeyName, sKey.size), self.LOG_WARN)
          return
@@ -304,7 +321,7 @@ class MultiCloudMirror:
             job = self.pool.apply_async(copyToCF, (srcBucketName, myKeyName, destBucketName))
          elif srcService == "cf":
             job = self.pool.apply_async(copyToS3, (srcBucketName, myKeyName, destBucketName, self.tmpDir))
-         job_dict = dict(job=job, task="copy", myKeyName=myKeyName, srcService=srcService, srcBucketName=srcBucketName, destBucketName=destBucketName, destService=destService)
+         job_dict = dict(job=job, task="copy", myKeyName=myKeyName, srcService=srcService, srcBucketName=srcBucketName, destBucketName=destBucketName, destService=destService, cfBucketName=cfBucketName, s3BucketName=s3BucketName)
          self.jobs.append(job_dict)
          self.copyCount = self.copyCount + 1
       else:
@@ -331,8 +348,9 @@ class MultiCloudMirror:
                      except (S3ResponseError, S3PermissionsError, S3CopyError) as err:
                         self.logItem("Error in %s %s to/from S3 bucket %s: [%d] %s" % (job_dict['task'], job_dict['myKeyName'], job_dict['s3BucketName'], err.status, err.reason), self.LOG_WARN)
                         self.jobs.remove(job_dict)
-                     except (ResponseError, NoSuchContainer, InvalidContainerName, InvalidUrl, ContainerNotPublic, AuthenticationFailed, AuthenticationError,
-                             NoSuchObject, InvalidObjectName, InvalidMetaName, InvalidMetaValue, InvalidObjectSize, IncompleteSend) as err:
+                     # except (ResponseError, NoSuchContainer, InvalidContainerName, InvalidUrl, ContainerNotPublic, AuthenticationFailed, AuthenticationError,
+                     #         NoSuchObject, InvalidObjectName, InvalidMetaName, InvalidMetaValue, InvalidObjectSize, IncompleteSend) as err:
+                     except Exception as err:
                         self.logItem("Error in %s %s to/from to CF container %s: %s" % (job_dict['task'], job_dict['myKeyName'], job_dict['cfBucketName'], err), self.LOG_WARN)
                         self.jobs.remove(job_dict)
                      except MultiCloudMirrorException as err:

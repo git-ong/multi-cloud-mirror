@@ -452,7 +452,7 @@ if __name__ == '__main__':
       parser = argparse.ArgumentParser(description='Multi-Cloud Mirror Script')
       parser.add_argument('--process', dest='numProcesses',type=int, default=4,
                           help='number of simultaneous file upload threads to run')
-      parser.add_argument('--maxsize', dest='maxFileSize',type=int, default=5368709120,
+      parser.add_argument('--maxsize', dest='maxFileSize',type=int, default=pyrax.object_storage.MAX_FILE_SIZE,
                           help='maximium file size to sync, in bytes (files larger than this size will be skipped)')
       parser.add_argument('--from', help='email address from which to send the status email; must be specified to receive message', dest='emailSrc')
       parser.add_argument('--to', dest='emailDest',

@@ -179,7 +179,9 @@ class MultiCloudMirror:
       Log function for MultiCloudMirror class: email and printing to screen
       """
       if level >= 0:
-         if self.debug: print (msg)
+         if self.debug: 
+            print (msg)
+            sys.stdout.flush()
          if level >= 1:
             self.emailMsg += msg + "\n"
 

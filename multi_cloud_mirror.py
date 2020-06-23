@@ -32,6 +32,7 @@ from boto.exception import S3ResponseError, S3PermissionsError, S3CopyError
 #                                ContainerNotPublic, AuthenticationFailed, AuthenticationError,
 #                                NoSuchObject, InvalidObjectName, InvalidMetaName, InvalidMetaValue,
 #                                InvalidObjectSize, IncompleteSend)
+from pyrax.exceptions import ClientException
 from configparser import NoSectionError, NoOptionError, MissingSectionHeaderError, ParsingError
 from email.mime.text import MIMEText
 from subprocess import Popen, PIPE
@@ -287,8 +288,12 @@ class MultiCloudMirror:
       """
       Check to see if this file should be copied, and, if so, queue it
       """
-      myKeyName = getattr(sKey, 'key', sKey.name)
-      self.filesAtSource[myKeyName] = sKey.etag.replace('"','')
+      try:
+         myKeyName = getattr(sKey, 'key', sKey.name)
+         self.filesAtSource[myKeyName] = sKey.etag.replace('"','')
+      except ClientException as err:
+         self.logItem("Skipping %s because Pyrax ClientException: %s" % (myKeyName, err), self.LOG_DEBUG)
+         return
 
       # skip S3 "folders", since Cloud Files doesn't support them, and skip files that are too large
       self.logItem("Found %s at source" % (myKeyName), self.LOG_DEBUG)

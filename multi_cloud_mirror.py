@@ -64,7 +64,7 @@ def connectToClouds():
    # except (ResponseError, InvalidUrl, AuthenticationFailed, AuthenticationError) as err:
    #    raise MultiCloudMirrorException("Error in connecting to CF: %s" % (err))
    except Exception as err:
-      raise Exception ("Error in connecting to CF: %s" % (err))
+      raise Exception ("Error in connecting to CF: %s" % str(err))
 
    return (s3Conn, cfConn)
 
@@ -292,7 +292,7 @@ class MultiCloudMirror:
          myKeyName = getattr(sKey, 'key', sKey.name)
          self.filesAtSource[myKeyName] = sKey.etag.replace('"','')
       except ClientException as err:
-         self.logItem("Skipping %s because Pyrax ClientException: %s" % (myKeyName, err), self.LOG_DEBUG)
+         self.logItem("Skipping %s because Pyrax ClientException: %s" % (myKeyName, str(err)), self.LOG_DEBUG)
          return
       except Exception as err:
          raise Exception ("Error in getting key attribute: %s" % str(err))
@@ -361,7 +361,7 @@ class MultiCloudMirror:
                      # except (ResponseError, NoSuchContainer, InvalidContainerName, InvalidUrl, ContainerNotPublic, AuthenticationFailed, AuthenticationError,
                      #         NoSuchObject, InvalidObjectName, InvalidMetaName, InvalidMetaValue, InvalidObjectSize, IncompleteSend) as err:
                      except Exception as err:
-                        self.logItem("Error in %s %s to/from to CF container %s: %s" % (job_dict['task'], job_dict['myKeyName'], job_dict['cfBucketName'], err), self.LOG_WARN)
+                        self.logItem("Error in %s %s to/from to CF container %s: %s" % (job_dict['task'], job_dict['myKeyName'], job_dict['cfBucketName'], str(err)), self.LOG_WARN)
                         self.jobs.remove(job_dict)
                      except MultiCloudMirrorException as err:
                         self.logItem("MultiCloudMirror error in %s %s: %s" % (job_dict['task'], job_dict['myKeyName'], str(err)), self.LOG_WARN)

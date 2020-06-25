@@ -294,6 +294,9 @@ class MultiCloudMirror:
       except ClientException as err:
          self.logItem("Skipping %s because Pyrax ClientException: %s" % (myKeyName, err), self.LOG_DEBUG)
          return
+      except Exception as err:
+         raise Exception ("Error in getting key attribute: %s" % str(err))
+         return
 
       # skip S3 "folders", since Cloud Files doesn't support them, and skip files that are too large
       self.logItem("Found %s at source" % (myKeyName), self.LOG_DEBUG)

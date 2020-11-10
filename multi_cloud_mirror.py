@@ -316,7 +316,9 @@ class MultiCloudMirror:
       # Copy if MD5 (etag) values are different, or if file does not exist at destination
       doCopy = False;
       try:
-         if self.filesAtDestination[myKeyName] != sKey.etag.replace('"',''):
+         self.logItem("Source md5: %s" % self.filesAtSource[myKeyName], self.LOG_DEBUG)
+         self.logItem("Dest   md5: %s" % self.filesAtDestination[myKeyName], self.LOG_DEBUG)
+         if self.filesAtDestination[myKeyName] != self.filesAtSource[myKeyName]:
             # the file is at the destination, but the md5sums do not match, so overwrite
             doCopy = True
             self.logItem("...Found at destination, but md5sums did not match, so it will be copied", self.LOG_DEBUG)
@@ -425,7 +427,7 @@ class MultiCloudMirror:
             self.logItem("Error in connecting to S3 bucket: [%d] %s" % (err.status, err.reason), self.LOG_WARN)
             continue
          except (ResponseError, NoSuchContainer, InvalidContainerName, InvalidUrl, ContainerNotPublic, AuthenticationFailed, AuthenticationError) as err:
-            self.logItem("Error in connecting to CF container: %s" % (err), self.LOG_WARN)
+            self.logItem("Error in connecting to CF container: %s" % str(err), self.LOG_WARN)
             continue
          # Iterate through files at the source to see which ones to copy, and put them on the multiprocessing queue:
          for sKey in self.srcList:

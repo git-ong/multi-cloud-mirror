@@ -352,9 +352,7 @@ class MultiCloudMirror:
                      except (S3ResponseError, S3PermissionsError, S3CopyError) as err:
                         self.logItem("Error in %s %s to/from S3 bucket %s: [%d] %s" % (job_dict['task'], job_dict['myKeyName'], job_dict['s3BucketName'], err.status, err.reason), self.LOG_WARN)
                         self.jobs.remove(job_dict)
-                     # except (ResponseError, NoSuchContainer, InvalidContainerName, InvalidUrl, ContainerNotPublic, AuthenticationFailed, AuthenticationError,
-                     #         NoSuchObject, InvalidObjectName, InvalidMetaName, InvalidMetaValue, InvalidObjectSize, IncompleteSend) as err:
-                     except Exception as err:
+                     except (ClientException, NoSuchContainer, AuthenticationFailed, NoSuchObject) as err:
                         self.logItem("Error in %s %s to/from to CF container %s: %s" % (job_dict['task'], job_dict['myKeyName'], job_dict['cfBucketName'], str(err)), self.LOG_WARN)
                         self.jobs.remove(job_dict)
                      except MultiCloudMirrorException as err:

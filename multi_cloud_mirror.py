@@ -17,7 +17,6 @@ versa.
 ### Imports
 #######################################################################
 import boto
-# import cloudfiles
 import pyrax
 import smtplib
 import os
@@ -28,11 +27,7 @@ import argparse
 import configparser
 import multiprocessing
 from boto.exception import S3ResponseError, S3PermissionsError, S3CopyError
-# from cloudfiles.errors import (ResponseError, NoSuchContainer, InvalidContainerName, InvalidUrl,
-#                                ContainerNotPublic, AuthenticationFailed, AuthenticationError,
-#                                NoSuchObject, InvalidObjectName, InvalidMetaName, InvalidMetaValue,
-#                                InvalidObjectSize, IncompleteSend)
-from pyrax.exceptions import ClientException
+from pyrax.exceptions import (ClientException, NoSuchContainer, AuthenticationFailed, NoSuchObject, InvalidSize)
 from configparser import NoSectionError, NoOptionError, MissingSectionHeaderError, ParsingError
 from email.mime.text import MIMEText
 from subprocess import Popen, PIPE
@@ -56,15 +51,12 @@ def connectToClouds():
       pyrax.set_default_region(cfConfig.get('Credentials','region'))
       pyrax.set_credentials(cfConfig.get('Credentials','username'), cfConfig.get('Credentials','api_key'))
       cfConn = pyrax.connect_to_cloudfiles(cfConfig.get('Credentials','region'))
-   #    cfConn = cloudfiles.get_connection(cfConfig.get('Credentials','username'), cfConfig.get('Credentials','api_key'))
-   # except (NoSectionError, NoOptionError, MissingSectionHeaderError, ParsingError) as err:
-   #    raise MultiCloudMirrorException("Error in reading Cloud Files configuration file (/etc/cloudfiles.cfg): %s" % (err))
-   # except (S3ResponseError, S3PermissionsError) as err:
-   #    raise MultiCloudMirrorException("Error in connecting to S3: [%d] %s" % (err.status, err.reason))
-   # except (ResponseError, InvalidUrl, AuthenticationFailed, AuthenticationError) as err:
-   #    raise MultiCloudMirrorException("Error in connecting to CF: %s" % (err))
-   except Exception as err:
-      raise Exception ("Error in connecting to CF: %s" % str(err))
+   except (NoSectionError, NoOptionError, MissingSectionHeaderError, ParsingError) as err:
+      raise MultiCloudMirrorException("Error in reading Cloud Files configuration file (/etc/cloudfiles.cfg): %s" % (err))
+   except (S3ResponseError, S3PermissionsError) as err:
+      raise MultiCloudMirrorException("Error in connecting to S3: [%d] %s" % (err.status, err.reason))
+   except (ClientException, AuthenticationFailed) as err:
+      raise MultiCloudMirrorException("Error in connecting to CF: %s" % str(err))
 
    return (s3Conn, cfConn)
 
@@ -426,7 +418,7 @@ class MultiCloudMirror:
          except (S3ResponseError, S3PermissionsError) as err:
             self.logItem("Error in connecting to S3 bucket: [%d] %s" % (err.status, err.reason), self.LOG_WARN)
             continue
-         except (ResponseError, NoSuchContainer, InvalidContainerName, InvalidUrl, ContainerNotPublic, AuthenticationFailed, AuthenticationError) as err:
+         except (ClientException, NoSuchContainer, AuthenticationFailed) as err:
             self.logItem("Error in connecting to CF container: %s" % str(err), self.LOG_WARN)
             continue
          # Iterate through files at the source to see which ones to copy, and put them on the multiprocessing queue:

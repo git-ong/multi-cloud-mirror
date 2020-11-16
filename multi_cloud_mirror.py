@@ -95,12 +95,7 @@ def copyToCF(srcBucketName, myKeyName, destBucketName):
    destBucket = cfConn.get_container(destBucketName)
    #with S3, we must request the key singly to get its metadata:
    fullKey = srcBucket.get_key(myKeyName)
-   #initialize new object at Cloud Files
-   # newObj = destBucket.create_object(myKeyName)
-   # newObj.content_type = fullKey.content_type or "application/octet-stream"
-   # newObj.size = fullKey.size
-   #stream the file from S3 to Cloud Files
-   # newObj.send(fullKey)
+   # create new Cloud Files object and stream the file from S3 to Cloud Files
    content_type = fullKey.content_type or fullKey.DefaultContentType
    newObj = destBucket.create(obj_name=myKeyName, data=fullKey.get_contents_as_string(), content_type=content_type)
 

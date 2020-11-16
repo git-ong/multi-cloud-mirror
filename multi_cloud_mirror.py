@@ -57,7 +57,6 @@ def connectToClouds():
       raise MultiCloudMirrorException("Error in connecting to S3: [%d] %s" % (err.status, err.reason))
    except (ClientException, AuthenticationFailed) as err:
       raise MultiCloudMirrorException("Error in connecting to CF: %s" % str(err))
-
    return (s3Conn, cfConn)
 
 

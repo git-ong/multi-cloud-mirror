@@ -7,6 +7,8 @@ multi_cloud_mirror.py
 Licensed under the Mozilla Public License (MPL) v1.1
 Full license terms available at http://www.mozilla.org/MPL/MPL-1.1.html
 
+Updated to use Pyrax by Juey C. Ong.
+
 multi_cloud_mirror provides an easy, multi-processing way of synchronizing
 a bucket at Amazon S3 to a container at Rackspace Cloud Files, or vice
 versa.
